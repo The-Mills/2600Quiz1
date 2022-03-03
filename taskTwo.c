@@ -175,6 +175,14 @@ void changeMaxValue()
     if(value < minValue || value > maxPossibleValue)
         goto maxValue_badInput;
     maxValue = value;
+
+
+    // Write to file
+
+    FILE *fp;
+    fp = fopen("./maxValue.txt", "w");
+    putw(maxValue, fp);
+    fclose(fp);
     return;
 
     maxValue_badInput:
@@ -185,11 +193,28 @@ void changeMaxValue()
 // Define a main function
 int main()
 {
+    // Read the last-saved max value
+    FILE *fp;
+    fp = fopen("./maxValue.txt", "r");
+    int tempMax = getw(fp);
+    if(tempMax < minValue || tempMax > maxPossibleValue)
+    {
+        printf("ERROR: Bad value when reading stored max-value."
+            " Reverting to default value of 10.\n");
+        maxValue = 10;
+    }
+    else
+    {
+        maxValue = tempMax;
+        printf("Loaded a stored max-value of %d\n", tempMax);
+    }
+    fclose(fp);
+
     // Seed random number generator
     time_t currentTime;
     time(&currentTime);
     srand((unsigned) currentTime);
-    
+
     // Define all variables that will be used throughout the program.
     char userCharInput;
 
