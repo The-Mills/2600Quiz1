@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // Define global variables if necessary.
 int maxPossibleValue = 1000000, maxPossibleValueDigits = 7, 
-    maxValue = 10, minValue = 1;
-char gameLog[] = "Game Log:\n";
+    maxValue = 10, minValue = 1, gamesPlayed = 0;
+int guessesPerGame[9999]; // 10000 games before buffer overflow
 
 // A helper function that consumes all extra input characters from stdin.
 // Returns a value > 0 if there were extra characters in the buffer, else 0.
@@ -22,26 +23,115 @@ int flushBuffer()
 // Define a playGame() function
 void playGame()
 {
+    gamesPlayed++;
+
     // Define all relevant local variables
+    char currentCharInput;
+    char userNumberInput[maxPossibleValueDigits];
+    int numberGuesses = 0, currentNumDigits = 0, value = 0,
+    correctNumber = rand() % (maxValue - minValue + 1) + minValue;
+
+    // Place the game into a second infinite loop.
+    while(1)
+    {
+        // Ask the user to input a number
+        game_promptInput:
+        printf("\nPlease enter a number between %d and %d," 
+            " inclusive or 'q' to quit: ", minValue, maxValue);
+        
+        // Reset variables used in the user input loop
+        currentNumDigits = 0;
+        value = 0;
+        // Collect and validate user input
+        currentCharInput = getchar();
+        if(currentCharInput == '\n' || currentCharInput == EOF) // Case 1 - Only enters newline
+            goto game_badInput;
+        else if(currentCharInput == 'q' || currentCharInput == 'Q') // Case 2 - Player quits
+        {
+            if(flushBuffer() > 0)
+                goto game_badInput;
+            else
+                // The player's Q input has been fully verified as legal. Continue to
+                // next part of the program.
+                goto game_quitInput;
+        }
+        else if (currentCharInput >= '0' && currentCharInput <= '9') // Case 3 - Enters number
+        {
+            userNumberInput[currentNumDigits++] = currentCharInput;
+
+            for(currentNumDigits; currentNumDigits < maxPossibleValueDigits; currentNumDigits++)
+            {
+                currentCharInput = getchar();
+                if(currentCharInput < '0' || currentCharInput > '9')
+                {
+                    if(currentCharInput != '\n' && currentCharInput != EOF)
+                    {
+                        flushBuffer();
+                        goto game_badInput;
+                    }
+                    else
+                        goto game_numberInput_smallBuffer;
+                }
+                userNumberInput[currentNumDigits] = currentCharInput;
+            }
+            if(flushBuffer() > 0) // More than maxPossibleValueDigits input
+                goto game_badInput;
+            game_numberInput_smallBuffer:
+
+            // Convert to integer from char array.
+            for(int i = 0; currentNumDigits > 0; currentNumDigits--, i++)
+                value += (int)pow(10, i) * (userNumberInput[currentNumDigits -1] - '0');
+            
+            // Verify input is between the current maximum and minimum values.
+            if(value < minValue || value > maxValue)
+                goto game_badInput;
+            
+            // Integer input has now been fully verified as legal. Continue to next
+            // part of the program.
+            goto game_goodIntegerInput;
+        }
+        else // Case 4 - All other bad inputs
+        {
+            flushBuffer();
+            goto game_badInput;
+        }
+
+        game_badInput:
+        printf("ERROR: Bad value entered. Please try again.\n");
+        goto game_promptInput;
+
+
+        // If the input value is a number, compare it with the correct number
+        game_goodIntegerInput:
+        numberGuesses++;
+        // If the guess is correct, store the game's data, congratulate
+        // the player, then return.
+        if(value == correctNumber)
+        {
+            printf("You guessed correctly after %d guesses!" 
+                " Congratulations!\n----------\n", numberGuesses);
+            guessesPerGame[gamesPlayed] = numberGuesses;
+            return;
+        }
+        // If the game is a loss, inform the user and prompt for another guess.
+        else
+        {
+            if(value < correctNumber)
+                printf("You guessed too low! Try again!");
+            else
+                printf("You guessed too high! Try again!");
+            goto game_promptInput;
+        }
+
+        // If the input value is 'q' --> mark the game as a loss and return
+        game_quitInput:
+        printf("You forfetied the game after %d guesses!"
+            " The correct value was %d\n----------\n", numberGuesses, correctNumber);
+        guessesPerGame[gamesPlayed] = -1;
+        return;
+    }
+    
 }
-
-
-// Ask the user to input a number
-
-// Collect and validate user input
-
-// Execute different instructions based on the input value
-
-// If the input value is 'q' --> mark the game as a loss and return
-
-// If the input value is a number, compare it with the correct number
-
-// If the guess is correct, store the game's data, congratulate
-// the player, then return.
-
-// If the game is a loss, inform the user and prompt for another guess.
-
-
 
 // Define a changeMaxValue() function
 void changeMaxValue()
@@ -72,7 +162,7 @@ void changeMaxValue()
         }
         userNumberInput[currentNumDigits] = currentChar;
     }
-    if(flushBuffer() > 0) // More than maxNumberCharacters input
+    if(flushBuffer() > 0) // More than maxPossibleValueDigits input
         goto maxValue_badInput;
     maxValue_smallBuffer:
 
@@ -95,6 +185,11 @@ void changeMaxValue()
 // Define a main function
 int main()
 {
+    // Seed random number generator
+    time_t currentTime;
+    time(&currentTime);
+    srand((unsigned) currentTime);
+    
     // Define all variables that will be used throughout the program.
     char userCharInput;
 
@@ -109,7 +204,8 @@ int main()
 
         // Collect and validate user input, flushing buffer after the first character.
         scanf("%c", &userCharInput);
-        if (userCharInput == '\n' || flushBuffer() > 0 || (userCharInput != '1' && userCharInput != '2' && userCharInput != '3'))
+        if (userCharInput == '\n' || userCharInput == EOF || flushBuffer() > 0 
+        || (userCharInput != '1' && userCharInput != '2' && userCharInput != '3'))
         {
             printf("ERROR: Please enter exactly 1, 2, or 3.\n"
                     "----------\n");
@@ -137,7 +233,12 @@ int main()
     // Terminate program
     terminate_program:
     printf("\n\nThank you for playing!\n");
-    printf("%s", gameLog);
-
+    for(int i = 1; i <= gamesPlayed; i++)
+    {
+        if(guessesPerGame[i] == -1)
+            printf("Game #%d - You forfeited and lost this game!\n", i);
+        else
+            printf("Game #%d - You won after %d guesses!\n", i, guessesPerGame[i]);
+    }
     return 0;
 }
